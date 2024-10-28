@@ -30,9 +30,10 @@ class MP():
         return encoder,decoder
 
     # function to find absorbing states
-    def find_absorbing_states(self):
+    def find_absorbing_states(self,P:None):
         absorbing_states = []
-        for i, row in enumerate(self.P):
+        P = self.P if P is None else P
+        for i, row in enumerate(P):
             if np.count_nonzero(row) == 1 and row[i] == 1:
                 absorbing_states.append(i)
         return absorbing_states
