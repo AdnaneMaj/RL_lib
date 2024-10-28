@@ -168,7 +168,7 @@ class Validator:
             # Validate states
             if (r[0] not in self_obj.S) or (format_id in [1,3] and (len(r)>1 and r[1] not in self_obj.S)):
                 raise ValueError(ValueErros.INVALID_STATES_R.value)
-            if format_id in [2, 3] and ((len(r)>1 and r[1] not in self_obj.A) or (len(r) > 2 and r[2] in self_obj.A)):
+            if format_id in [2, 3] and ((len(r)>1 and r[1] not in self_obj.A) or (len(r) > 2 and r[2] not in self_obj.A)):
                 raise ValueError(ValueErros.INVALID_ACTIONS_R.value)
         return R,format_id
     
