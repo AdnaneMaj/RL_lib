@@ -35,6 +35,11 @@ class MDP(MRP):
         random_policy = random_policy / random_policy.sum(axis=0, keepdims=True)
         return random_policy
     
+    def find_absorbing_states(self, P=None):
+        P = self.P.sum(axis=-1) if P is None else P
+        return super().find_absorbing_states(P)
+
+    
     def MDP_under_policy(self,policy)->MRP:
         """
         An MDP under policy is a MRP
@@ -53,15 +58,46 @@ class MDP(MRP):
 
         return MRP(S,gamma,new_P,new_R)
     
-    def state_value_function(self,s:int,policy):
-        """
-        The expected return starting from state s, 
-        and then following policy π
-        """
-        if self.R_v:
-            V = np.einsum('as,sa->s',policy,np.dot(V,P))
-        
+    @staticmethod
+    def extract_values(*args, **kwargs):
+        verbose = MRP.extract_values(*args, **kwargs)
+        policy = kwargs['policy']
+        return verbose,policy
 
+    def iterate_V(self,V,*args,**kwargs):
+        """
+        Performs a single iteration of the state value function.
+        if self.R_v = 0 
+            v(s) = R(s)+gamma.sum(P(s,s')*v(s'))
+        else :
+            v(s) = sum(R(s,s')+gamma.P(s,s')*v(s'))
+        """
+        #extract verbose
+        verbose,policy = MDP.extract_values(*args,**kwargs)
+
+        if self.R_v==2:
+            V_new = np.einsum('as,sa->s',policy,self.R_+self.gamma*np.einsum('ssa,s->sa', self.P, V))
+        if self.R_v==3:
+            V_new = np.einsum('as,sa->s',policy,self.R_.sum(axis=1)+self.gamma*np.einsum('ssa,s->sa', self.P, V))
+    
+        if verbose:
+            print(V_new)
+        return V_new
+    
+    def iterate_Q(self,Q,*args,**kwargs):
+        """
+        Performs a single iteration of the state action function.
+        """
+        #extract verbose
+        verbose,policy = MDP.extract_values(*args,**kwargs)
+
+        if self.R_v==2:
+            Q_new = self.R_+self.gamma*np.einsum('ssa,as,sa->sa', self.P, policy, Q)
+        elif self.R_v==3:
+            Q_new = self.gamma*np.einsum('ssa,as,sa->sa', self.P+self.R_.sum(axis=1), policy, Q)
+        if verbose:
+            print(Q_new)
+        return Q_new
 
 
 
