@@ -24,6 +24,8 @@ class MRP(MP):
         n = self.n_states
         self.value_vector = np.zeros(n)
         self.appropriate_shape = {0:(n,),1:(n,n)}
+        if self.__class__.__name__ == "MRP":
+            self.set_R_()
     
     def set_R_(self):
         """
@@ -39,7 +41,7 @@ class MRP(MP):
             elif self.R_v==2:
                 index = (self.states_encoder[key[0]],self.actions_encoder[key[1]])
             elif self.R_v==3:
-                index = (self.states_encoder[key[0]],self.states_encoder[key[1]],self.actions_encoder[key[1]])
+                index = (self.states_encoder[key[0]],self.states_encoder[key[1]],self.actions_encoder[key[2]])
             return index
         
         shape = self.appropriate_shape[self.R_v] #Get the apropriate shape
@@ -63,23 +65,18 @@ class MRP(MP):
 
         return np.dot(gamma_vector,self.R_)
     
-    #iterative way to compute it
-    def value_function_vector(self,start_state_vector = None,verbose=False,**kwargs):
-        """
-        Either T_max or epislon
+    @staticmethod
+    def extract_values(*args,**kwargs):
+        # Extracting optional arguments from args or kwargs
+        verbose = False
+        if 'verbose' in kwargs:
+            verbose = kwargs['verbose']  # Keyword argument if provided
+        elif len(args) > 2:
+            verbose = args[2]  
+        return verbose
 
-        """
-
-        # Validate the kwargs to ensure only one valid key is provided
-        if len(kwargs) != 1 or not set(kwargs).issubset({'T_max', 'epsilon'}):
-            raise ValueError(
-                f"Provide exactly one parameter: either 'T_max' or 'epsilon'. Got: {list(kwargs.keys())}"
-            )
-        
-        if start_state_vector is None:
-            start_state_vector = np.zeros((self.n_states,))
-        
-        def iterate(V):
+    
+    def iterate_V(self,V,*args,**kwargs):
             """
             Performs a single iteration of the value function.
             if self.R_v = 0 
@@ -87,6 +84,9 @@ class MRP(MP):
             else :
                v(s) = sum(R(s,s')+gamma.P(s,s')*v(s'))
             """
+            #extract verbose
+            verbose = MRP.extract_values(*args,**kwargs)
+                
             if self.R_v==0:
                 V = self.R_+ self.gamma * np.dot(self.P,V)
             elif self.R_v==1:
@@ -94,6 +94,26 @@ class MRP(MP):
             if verbose:
                 print(V)
             return V
+    
+    #iterative way to compute state value function or state action function
+    def state_va_function_vector(self,start_state_vector = None,func:str = "V",*args,**kwargs):
+        """
+        Either T_max or epislon
+        """
+
+        if func=="V":
+            iterate_func = self.iterate_V
+        elif func=="Q":
+            iterate_func = self.iterate_Q
+        
+        # Validate the kwargs to ensure only one valid key is provided
+        if not set(kwargs).issubset({'T_max', 'epsilon','policy','verbose'}):
+            raise ValueError(
+                f"Got an unexpected keyword argument, allowed keywargs : ['T_max', 'epsilon','policy']. Got: {list(kwargs.keys())}"
+            )
+        
+        if start_state_vector is None:
+            start_state_vector = np.zeros((self.n_states,)) if func=="V" else np.zeros((self.n_states,self.n_actions))
 
         # Initialize the value vector
         V = np.array(start_state_vector)
@@ -102,13 +122,13 @@ class MRP(MP):
         if 'T_max' in kwargs:
             T_max = kwargs['T_max']
             for _ in range(T_max):
-                V = iterate(V)
+                V = iterate_func(V,*args,**kwargs)
             return V
 
         elif 'epsilon' in kwargs:
             epsilon = kwargs['epsilon']
             while True:
-                V_new = iterate(V)
+                V_new = iterate_func(V,*args,**kwargs)
                 if np.linalg.norm(V - V_new) <= epsilon:
                     break
                 V = V_new

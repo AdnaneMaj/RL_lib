@@ -20,7 +20,7 @@ class MP():
         self.absorbing_state = self.find_absorbing_states()
         self.states_encoder,self.states_decoder = self.encode_decode(param="S")
 
-    def encode_decode(self,param):
+    def encode_decode(self,param:str):
         encoder = {}
         decoder = {}
         for i,p in enumerate(getattr(self,param)):
@@ -30,7 +30,7 @@ class MP():
         return encoder,decoder
 
     # function to find absorbing states
-    def find_absorbing_states(self,P:None):
+    def find_absorbing_states(self,P=None):
         absorbing_states = []
         P = self.P if P is None else P
         for i, row in enumerate(P):

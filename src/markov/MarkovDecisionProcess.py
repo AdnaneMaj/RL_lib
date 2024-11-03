@@ -76,9 +76,9 @@ class MDP(MRP):
         verbose,policy = MDP.extract_values(*args,**kwargs)
 
         if self.R_v==2:
-            V_new = np.einsum('as,sa->s',policy,self.R_+self.gamma*np.einsum('ssa,s->sa', self.P, V))
+            V_new = np.einsum('as,sa->s',policy,self.R_+self.gamma*np.einsum('sta,t->sa', self.P, V))
         if self.R_v==3:
-            V_new = np.einsum('as,sa->s',policy,self.R_.sum(axis=1)+self.gamma*np.einsum('ssa,s->sa', self.P, V))
+            V_new = np.einsum('as,sa->s',policy,self.R_.sum(axis=1)+self.gamma*np.einsum('sta,t->sa', self.P, V))
     
         if verbose:
             print(V_new)
@@ -92,9 +92,9 @@ class MDP(MRP):
         verbose,policy = MDP.extract_values(*args,**kwargs)
 
         if self.R_v==2:
-            Q_new = self.R_+self.gamma*np.einsum('ssa,as,sa->sa', self.P, policy, Q)
+            Q_new = self.R_+self.gamma*np.einsum('sta,bt,tb->sa', self.P, policy, Q)
         elif self.R_v==3:
-            Q_new = self.gamma*np.einsum('ssa,as,sa->sa', self.P+self.R_.sum(axis=1), policy, Q)
+            Q_new = self.gamma*np.einsum('sta,bt,tb->sa', self.P+self.R_.sum(axis=1), policy, Q)
         if verbose:
             print(Q_new)
         return Q_new
