@@ -1,6 +1,6 @@
 from .MarkovRewardProcess import MRP
 from typing import List,Callable
-from utils import Validator
+from ..utils import Validator
 import numpy as np
 
 class MDP(MRP):
@@ -8,7 +8,7 @@ class MDP(MRP):
     @Validator.unique_list("A")
     @Validator.shape(param_name="P")
     @Validator.Reward()
-    def __init__(self, S, P, gamma, R, A):
+    def __init__(self, S, P, gamma, R, A,policy = None):
         """
         P here is P[s,s',A]
         """
@@ -17,6 +17,7 @@ class MDP(MRP):
         self.n_actions = len(A)
         self.actions_encoder,self.actions_decoder = self.encode_decode("A")
         self.P = P
+        self.policy = np.full((self.n_actions,self.n_states),1/self.n_actions)
 
         #constant
         n = self.n_states
@@ -40,7 +41,7 @@ class MDP(MRP):
         return super().find_absorbing_states(P)
 
     
-    def MDP_under_policy(self,policy)->MRP:
+    def MDP_under_policy(self)->MRP:
         """
         An MDP under policy is a MRP
         """
@@ -50,21 +51,21 @@ class MDP(MRP):
         
         S = self.S
         gamma = self.gamma
-        new_P = np.einsum('as,sra->sr', policy, self.P)
+        new_P = np.einsum('as,sra->sr', self.policy, self.P)
         if self.R_v == 2:
-            new_R = np.einsum('as,sa->s',policy,self.R)
+            new_R = np.einsum('as,sa->s',self.policy,self.R)
         elif self.R_v == 3:
-            new_R = np.einsum('as,sra->sr',policy,self.R)
+            new_R = np.einsum('as,sra->sr',self.policy,self.R)
 
         return MRP(S,gamma,new_P,new_R)
     
     @staticmethod
     def extract_values(*args, **kwargs):
         verbose = MRP.extract_values(*args, **kwargs)
-        policy = kwargs['policy']
-        return verbose,policy
+        return verbose
 
-    def iterate_V(self,V,*args,**kwargs):
+    #overwrite
+    def iterate_V(self,V,iteration_type,*args,**kwargs):
         """
         Performs a single iteration of the state value function.
         if self.R_v = 0 
@@ -73,30 +74,43 @@ class MDP(MRP):
             v(s) = sum(R(s,s')+gamma.P(s,s')*v(s'))
         """
         #extract verbose
-        verbose,policy = MDP.extract_values(*args,**kwargs)
+        verbose = MDP.extract_values(*args,**kwargs)
 
-        if self.R_v==2:
-            V_new = np.einsum('as,sa->s',policy,self.R_+self.gamma*np.einsum('sta,t->sa', self.P, V))
-        if self.R_v==3:
-            V_new = np.einsum('as,sa->s',policy,self.R_.sum(axis=1)+self.gamma*np.einsum('sta,t->sa', self.P, V))
+        if iteration_type == "policy":
+            #compute V_new and update policy
+            if self.R_v==2:
+                V_new = (self.R_+self.gamma*np.einsum('sta,t->sa', self.P, V)).max(axis=-1)
+            if self.R_v==3:
+                V_new = (self.R_.sum(axis=1)+self.gamma*np.einsum('sta,t->sa', self.P, V)).max(axis=-1)
+
+        elif iteration_type == "value":
+            #compute V_new and update policy
+            if self.R_v==2:
+                V_new = np.einsum('as,sa->s',self.policy,self.R_+self.gamma*np.einsum('sta,t->sa', self.P, V))
+            if self.R_v==3:
+                V_new = np.einsum('as,sa->s',self.policy,self.R_.sum(axis=1)+self.gamma*np.einsum('sta,t->sa', self.P, V))
+
     
         if verbose:
             print(V_new)
         return V_new
     
-    def iterate_Q(self,Q,*args,**kwargs):
+    def iterate_Q(self,Q,iteration_type,*args,**kwargs):
         """
         Performs a single iteration of the state action function.
         """
         #extract verbose
-        verbose,policy = MDP.extract_values(*args,**kwargs)
+        verbose = MDP.extract_values(*args,**kwargs)
 
+        #compute Q_new and update policy
         if self.R_v==2:
-            Q_new = self.R_+self.gamma*np.einsum('sta,bt,tb->sa', self.P, policy, Q)
+            Q_new = self.R_+self.gamma*np.einsum('sta,bt,tb->sa', self.P, self.policy, Q)
         elif self.R_v==3:
-            Q_new = self.gamma*np.einsum('sta,bt,tb->sa', self.P+self.R_.sum(axis=1), policy, Q)
+            Q_new = self.gamma*np.einsum('sta,bt,tb->sa', self.P+self.R_.sum(axis=1), self.policy, Q)
+        if iteration_type == "policy":
+            self.iterate_policy(Q_new)
         if verbose:
-            print(Q_new)
+            print(Q_new,self.policy)
         return Q_new
 
 

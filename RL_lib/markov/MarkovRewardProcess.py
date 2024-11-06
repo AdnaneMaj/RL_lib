@@ -3,7 +3,7 @@ import numpy as np
 np.set_printoptions(precision=2, suppress=True)
 
 import math
-from utils import Validator
+from ..utils import Validator
 from typing import Tuple
 
 class MRP(MP):
@@ -88,15 +88,21 @@ class MRP(MP):
             verbose = MRP.extract_values(*args,**kwargs)
                 
             if self.R_v==0:
-                V = self.R_+ self.gamma * np.dot(self.P,V)
+                V_new = self.R_+ self.gamma * np.dot(self.P,V)
             elif self.R_v==1:
-                V = self.R_.sum(axis=1) + self.gamma *np.dot(self.P,V)
+                V_new = self.R_.sum(axis=1) + self.gamma *np.dot(self.P,V)
             if verbose:
-                print(V)
-            return V
+                print(V_new)
+            return V_new
+    
+    def iterate_policy(self,Q):
+        argmax_actions = Q.argmax(axis=1)
+        self.policy = np.zeros((self.n_actions,self.n_states))
+        self.policy[argmax_actions.flatten(),np.arange(self.n_states)]=1
+
     
     #iterative way to compute state value function or state action function
-    def state_va_function_vector(self,start_state_vector = None,func:str = "V",*args,**kwargs):
+    def state_va_function_vector(self,start_state_vector = None,func:str = "V",iteration_type:str="policy",*args,**kwargs):
         """
         Either T_max or epislon
         """
@@ -107,9 +113,9 @@ class MRP(MP):
             iterate_func = self.iterate_Q
         
         # Validate the kwargs to ensure only one valid key is provided
-        if not set(kwargs).issubset({'T_max', 'epsilon','policy','verbose'}):
+        if not set(kwargs).issubset({'T_max', 'epsilon','verbose'}):
             raise ValueError(
-                f"Got an unexpected keyword argument, allowed keywargs : ['T_max', 'epsilon','policy']. Got: {list(kwargs.keys())}"
+                f"Got an unexpected keyword argument, allowed keywargs : ['T_max', 'epsilon']. Got: {list(kwargs.keys())}"
             )
         
         if start_state_vector is None:
@@ -122,17 +128,19 @@ class MRP(MP):
         if 'T_max' in kwargs:
             T_max = kwargs['T_max']
             for _ in range(T_max):
-                V = iterate_func(V,*args,**kwargs)
-            return V
+                V_new = iterate_func(V,iteration_type,*args,**kwargs)
+                V = V_new.copy()
 
         elif 'epsilon' in kwargs:
             epsilon = kwargs['epsilon']
             while True:
-                V_new = iterate_func(V,*args,**kwargs)
+                V_new = iterate_func(V,iteration_type,*args,**kwargs)
                 if np.linalg.norm(V - V_new) <= epsilon:
                     break
-                V = V_new
-            return V_new
+                V = V_new.copy()
+        if func == "Q":     
+            self.iterate_policy(V_new) 
+        return V_new
 
 
     def bellman_solver(self,solution_type:str="Direct"):

@@ -1,7 +1,7 @@
 from functools import wraps
 from typing import Callable, Union, Any, Optional, List,Tuple
 from inspect import signature
-from models import ValueErros
+from ..models import ValueErros
 
 class Validator:
     @staticmethod
